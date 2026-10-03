@@ -13,3 +13,5 @@
 pip install -r requirements.txt
 python data_loader.py
 ```
+
+*После успешного запуска скрипта в консоль выведутся первые 10 строк таблицы.*
