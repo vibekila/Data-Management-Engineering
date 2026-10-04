@@ -4,7 +4,7 @@ import pandas as pd
 
 def load_and_show_data():
 
-    url = "https://docs.google.com/spreadsheets/d/1op5pVvniPLiL88I-HxvgWKKqM0AA2PsP/edit"
+    url = "https://docs.google.com/spreadsheets/d/1op5pVvniPLiL88I-HxvgWKKqM0AA2PsP/export?format=csv"
     
     output = "dataset_for_DME.csv"
 
