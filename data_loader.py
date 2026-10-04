@@ -16,3 +16,7 @@ def load_and_show_data():
     print(df.head(10))
 
     return df
+    
+if __name__ == "__main__":
+    load_and_show_data()
+    
