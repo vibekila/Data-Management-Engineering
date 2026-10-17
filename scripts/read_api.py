@@ -4,14 +4,14 @@ from pygbif import occurrences
 
 BEETLES_ORDER_KEY = 1470
 
-def fetch_beetles_data():
+def fetch_beetles_data(limit=100):
     print("Запрос данных из открытой научной базы GBIF")
     
     try:
-        response = occurrences.search(orderKey=BEETLES_ORDER_KEY, limit=100, hasCoordinate=True)
+        response = occurrences.search(orderKey=BEETLES_ORDER_KEY, limit=limit, hasCoordinate=True)
         results = response.get("results", [])
-    except Exception as e:
-        print(f"Не удалось получить данные из API GBIF: {e}")
+    except requests.exceptions.RequestException as e:
+        print(f"Не удалось получить данные из API GBIF: {e}", file=sys.stderr)
         return pd.DataFrame()
 
     records = []
@@ -37,9 +37,10 @@ if __name__ == "__main__":
     os.makedirs("data", exist_ok=True)
     output_path = os.path.join("data", "beetles_dataset.csv")
 
-    df_beetles = fetch_beetles_data()
+    rows_to_show = 18
+    df_beetles = fetch_beetles_data(limit=100)
 
     if not df_beetles.empty:
         df_beetles.to_csv(output_path, index=False)
-        print(df_beetles.head(18))
+        print(df_beetles.head(rows_to_show))
       
