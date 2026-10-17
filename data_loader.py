@@ -39,3 +39,4 @@ def load_and_show_data(path="dataset_for_DME.csv", parquet_path="dataset_for_DME
 
 if __name__ == "__main__":
     load_and_show_data()
+
