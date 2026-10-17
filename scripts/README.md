@@ -21,3 +21,6 @@ pip install -r requirements.txt
 ```bash
 python scripts/read_api.py
 ```
+
+## Вывод скрипта в консоль
+![Вывод скрипта в терминале](beetles_api.png)
