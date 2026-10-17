@@ -40,7 +40,7 @@ if __name__ == "__main__":
     output_path = os.path.join("data", "beetles_dataset.csv")
 
     rows_to_show = 18
-    df_beetles = fetch_beetles_data(limit=100)
+    df_beetles = fetch_beetles_data()
 
     if not df_beetles.empty:
         df_beetles.to_csv(output_path, index=False)
