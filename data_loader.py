@@ -14,7 +14,6 @@ def cast_types(df):
         if col in df.columns:
             if df[col].dtype == 'object':
                 df[col] = df[col].astype(str).str.replace(',', '.', regex=False)
-           
             df[col] = pd.to_numeric(df[col], errors='coerce')
 
     return df
@@ -29,8 +28,8 @@ def load_and_show_data(path="dataset_for_DME.csv", parquet_path="dataset_for_DME
             gdown.download(DATASET_URL, part_path, quiet=False)
             df = pd.read_csv(part_path, sep=',', decimal=',')
             os.rename(part_path, path)
-        else:
-        df = pd.read_csv(path, sep=',', decimal=',')
+            else:
+            df = pd.read_csv(path, sep=',', decimal=',')
 
     df = cast_types(df)
 
