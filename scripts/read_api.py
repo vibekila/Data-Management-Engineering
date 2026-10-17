@@ -19,8 +19,8 @@ def fetch_beetles_data(limit=100):
     records = []
     for row in results:
         records.append({"scientific_name": row.get("scientificName"),
-            "family": row.get("family", "Unknown"),
-            "genus": row.get("genus", "Unknown"),
+            "family": row.get("family"),
+            "genus": row.get("genus"),
             "country": row.get("country"),
             "latitude": row.get("decimalLatitude"),
             "longitude": row.get("decimalLongitude"),
