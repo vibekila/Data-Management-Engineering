@@ -28,7 +28,7 @@ def load_and_show_data(path="dataset_for_DME.csv", parquet_path="dataset_for_DME
             gdown.download(DATASET_URL, part_path, quiet=False)
             df = pd.read_csv(part_path, sep=',', decimal=',')
             os.rename(part_path, path)
-            else:
+        else:
             df = pd.read_csv(path, sep=',', decimal=',')
 
     df = cast_types(df)
