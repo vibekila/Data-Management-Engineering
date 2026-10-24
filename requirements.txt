@@ -5,4 +5,4 @@ pygbif==0.7.0
 numpy==2.5.3
 seaborn==0.13.2
 pyarrow==26.0.0
-matplotlib==1.1
+matplotlib==3.11.2
