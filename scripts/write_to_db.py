@@ -63,11 +63,15 @@ try:
     sql_columns_types = []
     for col_old, col_clean in zip(df_100.columns, clean_columns):
         if pd.api.types.is_numeric_dtype(df_100[col_old]):
-            sql_columns_types.append(f"{col_clean} DOUBLE PRECISION")
+            type_sql = sql.SQL("DOUBLE PRECISION")
         else:
-            sql_columns_types.append(f"{col_clean} TEXT")
+            type_sql = sql.SQL("TEXT")
 
-    print(f"Таблица '{TABLE_NAME}' будет удалена и пересоздана.")
+        sql_columns_parts.append(
+            sql.SQL("{} {}").format(sql.Identifier(col_clean), type_sql)
+        )
+
+    print(f"[INFO]Таблица '{TABLE_NAME}' будет удалена и пересоздана.")
 
     cursor.execute(
         sql.SQL("DROP TABLE IF EXISTS {};").format(
