@@ -26,42 +26,51 @@ if not os.path.exists(parquet_path):
 df = pd.read_parquet(parquet_path)
 df_100 = df.head(100)
 
-host = os.getenv('DB_HOST') or "85.193.80.59"
-port = os.getenv('DB_PORT') or "5432"
-user = os.getenv('DB_USER') or "deexpert"
-password = os.getenv('DB_PASS') or "what_a_Wonderful_Day!"
-database = os.getenv('DB_NAME') or "homeworks"
+DB_HOST = os.getenv('DB_HOST')
+DB_PORT = os.getenv('DB_PORT')
+DB_USER = os.getenv('DB_USER')
+DB_PASS = os.getenv('DB_PASS')
+DB_NAME = os.getenv('DB_NAME')
+
+if not all([DB_HOST, DB_PORT, DB_USER, DB_PASS, DB_NAME]):
+    raise RuntimeError("Заданы не все переменные окружения.")
 
 conn = None
 cursor = None
 
 try:
-    print(f"Попытка подключения к PostgreSQL.")
+    print("Попытка подключения к PostgreSQL.")
     conn = psycopg2.connect(
-        host=host,
-        port=port,
-        user=user,
-        password=password,
-        database=database,
-        connect_timeout=10
+    host=DB_HOST,
+    port=DB_PORT,
+    user=DB_USER,
+    password=DB_PASS,
+    database=DB_NAME,
+    connect_timeout=10
     )
+
     cursor = conn.cursor()
     print("Успешное подключение.")
 
     clean_columns = [col.replace('(', '_').replace(')', '_').replace('.', '_').lower() for col in df_100.columns]
     
-    create_columns_sql = ", ".join([f"{col} DOUBLE PRECISION" for col in clean_columns])
-    create_table_query = f"CREATE TABLE IF NOT EXISTS {TABLE_NAME} (id SERIAL PRIMARY KEY, {create_columns_sql});"
+    sql_columns_types = []
+    for col_old, col_clean in zip(df_100.columns, clean_columns):
+        if pd.api.types.is_numeric_dtype(df_100[col_old]):
+            sql_columns_types.append(f"{col_clean} DOUBLE PRECISION")
+        else:
+            sql_columns_types.append(f"{col_clean} TEXT")
     
     cursor.execute(f"DROP TABLE IF EXISTS {TABLE_NAME};")
+    create_table_query = f"CREATE TABLE {TABLE_NAME} (id SERIAL PRIMARY KEY, {', '.join(sql_columns_types)});"
     cursor.execute(create_table_query)
     print(f"Таблица '{TABLE_NAME}' успешно пересоздана в PostgreSQL.")
 
     placeholders = ", ".join(["%s"] * len(clean_columns))
     insert_query = f"INSERT INTO {TABLE_NAME} ({', '.join(clean_columns)}) VALUES ({placeholders});"
     
-    for index, row in df_100.iterrows():
-        cursor.execute(insert_query, tuple(row))
+    data_records = [tuple(row) for _, row in df_100.iterrows()]
+    cursor.executemany(insert_query, data_records)
         
     conn.commit()
     print(f"\n100 строк датасета успешно записаны в удаленную таблицу PostgreSQL '{TABLE_NAME}'.")
