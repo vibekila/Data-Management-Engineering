@@ -66,10 +66,8 @@ try:
             type_sql = sql.SQL("DOUBLE PRECISION")
         else:
             type_sql = sql.SQL("TEXT")
-        
-        sql_columns_parts.append(
-            sql.SQL("{} {}").format(sql.Identifier(col_clean), type_sql)
-        )
+    sql_columns_parts.append(
+            sql.SQL("{} {}").format(sql.Identifier(col_clean), type_sql))
 
     print(f"[INFO] Таблица '{TABLE_NAME}' будет удалена и пересоздана.")
 
@@ -79,7 +77,7 @@ try:
         )
     )
     
-    create_table_query = sql.SQL("CREATE TABLE {} (id SERIAL PRIMARY KEY, {1});").format(
+    create_table_query = sql.SQL("CREATE TABLE {} (id SERIAL PRIMARY KEY, {});").format(
         sql.Identifier(TABLE_NAME),
         sql.SQL(", ").join(sql_columns_parts) # Используем правильный список
 )
