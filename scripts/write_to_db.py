@@ -67,7 +67,8 @@ try:
         else:
             type_sql = sql.SQL("TEXT")
     sql_columns_parts.append(
-            sql.SQL("{} {}").format(sql.Identifier(col_clean), type_sql))
+            sql.SQL("{} {}").format(sql.Identifier(col_clean), type_sql)
+    )
 
     print(f"[INFO] Таблица '{TABLE_NAME}' будет удалена и пересоздана.")
 
