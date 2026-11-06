@@ -66,7 +66,7 @@ try:
             type_sql = sql.SQL("DOUBLE PRECISION")
         else:
             type_sql = sql.SQL("TEXT")
-    
+
         sql_columns_parts.append(
             sql.SQL("{} {}").format(sql.Identifier(col_clean), type_sql)
         )
