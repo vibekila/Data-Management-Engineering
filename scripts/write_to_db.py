@@ -3,6 +3,9 @@ import sys
 import pandas as pd
 from dotenv import load_dotenv
 import psycopg2
+from psycopg2 import sql
+
+ROWS_COUNT = 100
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(script_dir, '..'))
@@ -20,11 +23,14 @@ if not os.path.exists(parquet_path):
     parquet_path = 'dataset_for_DME.parquet'
 
 if not os.path.exists(parquet_path):
-    print(f"Файл датасета не найден по пути {parquet_path}")
+    print(
+        f"Файл датасета не найден по пути {parquet_path}",
+        file=sys.stderr
+    )
     sys.exit(1)
 
 df = pd.read_parquet(parquet_path)
-df_100 = df.head(100)
+df_100 = df.head(ROWS_COUNT)
 
 DB_HOST = os.getenv('DB_HOST')
 DB_PORT = os.getenv('DB_PORT')
@@ -41,12 +47,12 @@ cursor = None
 try:
     print("Попытка подключения к PostgreSQL.")
     conn = psycopg2.connect(
-    host=DB_HOST,
-    port=DB_PORT,
-    user=DB_USER,
-    password=DB_PASS,
-    database=DB_NAME,
-    connect_timeout=10
+        host=DB_HOST,
+        port=DB_PORT,
+        user=DB_USER,
+        password=DB_PASS,
+        database=DB_NAME,
+        connect_timeout=10
     )
 
     cursor = conn.cursor()
@@ -60,14 +66,28 @@ try:
             sql_columns_types.append(f"{col_clean} DOUBLE PRECISION")
         else:
             sql_columns_types.append(f"{col_clean} TEXT")
+
+    print(f"Таблица '{TABLE_NAME}' будет удалена и пересоздана.")
+
+    cursor.execute(
+        sql.SQL("DROP TABLE IF EXISTS {};").format(
+            sql.Identifier(TABLE_NAME)
+        )
+    )
     
-    cursor.execute(f"DROP TABLE IF EXISTS {TABLE_NAME};")
-    create_table_query = f"CREATE TABLE {TABLE_NAME} (id SERIAL PRIMARY KEY, {', '.join(sql_columns_types)});"
+    create_table_query = sql.SQL("CREATE TABLE {} (id SERIAL PRIMARY KEY, {});").format(
+        sql.Identifier(TABLE_NAME),
+        sql.SQL(", ").join(sql.SQL(col_type) for col_type in sql_columns_types)
+    )
     cursor.execute(create_table_query)
     print(f"Таблица '{TABLE_NAME}' успешно пересоздана в PostgreSQL.")
 
-    placeholders = ", ".join(["%s"] * len(clean_columns))
-    insert_query = f"INSERT INTO {TABLE_NAME} ({', '.join(clean_columns)}) VALUES ({placeholders});"
+    placeholders = sql.SQL(", ").join([sql.Placeholder()] * len(clean_columns))
+    insert_query = sql.SQL("INSERT INTO {} ({}) VALUES ({});").format(
+        sql.Identifier(TABLE_NAME),
+        sql.SQL(", ").join(sql.Identifier(col) for col in clean_columns),
+        placeholders
+    )
     
     data_records = [tuple(row) for _, row in df_100.iterrows()]
     cursor.executemany(insert_query, data_records)
