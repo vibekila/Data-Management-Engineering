@@ -60,18 +60,18 @@ try:
 
     clean_columns = [col.replace('(', '_').replace(')', '_').replace('.', '_').lower() for col in df_100.columns]
     
-    sql_columns_types = []
+    sql_columns_parts = []
     for col_old, col_clean in zip(df_100.columns, clean_columns):
         if pd.api.types.is_numeric_dtype(df_100[col_old]):
             type_sql = sql.SQL("DOUBLE PRECISION")
         else:
             type_sql = sql.SQL("TEXT")
-
+        
         sql_columns_parts.append(
             sql.SQL("{} {}").format(sql.Identifier(col_clean), type_sql)
         )
 
-    print(f"[INFO]Таблица '{TABLE_NAME}' будет удалена и пересоздана.")
+    print(f"[INFO] Таблица '{TABLE_NAME}' будет удалена и пересоздана.")
 
     cursor.execute(
         sql.SQL("DROP TABLE IF EXISTS {};").format(
@@ -79,10 +79,10 @@ try:
         )
     )
     
-    create_table_query = sql.SQL("CREATE TABLE {} (id SERIAL PRIMARY KEY, {});").format(
+    create_table_query = sql.SQL("CREATE TABLE {} (id SERIAL PRIMARY KEY, {1});").format(
         sql.Identifier(TABLE_NAME),
-        sql.SQL(", ").join(sql.SQL(col_type) for col_type in sql_columns_types)
-    )
+        sql.SQL(", ").join(sql_columns_parts) # Используем правильный список
+)
     cursor.execute(create_table_query)
     print(f"Таблица '{TABLE_NAME}' успешно пересоздана в PostgreSQL.")
 
