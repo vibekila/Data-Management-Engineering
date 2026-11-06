@@ -1,2 +1,4 @@
 *.parquet
 data/
+.env
+creds.db
