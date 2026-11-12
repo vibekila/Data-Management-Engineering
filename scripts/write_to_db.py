@@ -1,112 +1,194 @@
-import os
-import sys
+
+import sqlite3
+from contextlib import closing
+from pathlib import Path
+
 import pandas as pd
-from dotenv import load_dotenv
 import psycopg2
 from psycopg2 import sql
+from psycopg2.extensions import connection as PGConnection
 
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+CREDS_FILE = BASE_DIR / "data" / "creds.db"
+PARQUET_FILE = BASE_DIR / "data" / "dataset_for_DME.parquet"
+
+DB_NAME = "homeworks"
+TABLE_NAME = "giniyatullinadm"
 ROWS_COUNT = 100
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.abspath(os.path.join(script_dir, '..'))
-env_path = os.path.join(project_root, '.env')
-if not os.path.exists(env_path):
-    project_root = os.path.abspath(os.path.join(script_dir, '..', '..'))
-    env_path = os.path.join(project_root, '.env')
 
-load_dotenv(dotenv_path=env_path)
+def load_dataset(file_path: Path, rows_count: int) -> pd.DataFrame:
+    """Загружает первые rows_count строк из Parquet."""
+    if not file_path.is_file():
+        raise FileNotFoundError(
+            f"Файл датасета не найден: {file_path}"
+        )
 
-TABLE_NAME = 'giniyatullinadm' 
+    df = pd.read_parquet(file_path)
 
-parquet_path = os.path.join(project_root, 'dataset_for_DME.parquet')
-if not os.path.exists(parquet_path):
-    parquet_path = 'dataset_for_DME.parquet'
+    if len(df) < rows_count:
+        raise ValueError(
+            f"Требуется {rows_count} строк, найдено {len(df)}"
+        )
 
-if not os.path.exists(parquet_path):
-    print(
-        f"Файл датасета не найден по пути {parquet_path}",
-        file=sys.stderr
+    return df.head(rows_count).copy()
+
+
+def load_credentials(
+    creds_file: Path,
+    db_name: str,
+) -> dict[str, str]:
+    """Читает параметры подключения из SQLite."""
+    if not creds_file.is_file():
+        raise FileNotFoundError(
+            f"Файл с реквизитами не найден: {creds_file}"
+        )
+
+    with closing(sqlite3.connect(creds_file)) as connection:
+        connection.row_factory = sqlite3.Row
+
+        row = connection.execute(
+            """
+            SELECT url, port, user, pass, db_name
+            FROM access
+            WHERE db_name = ?
+            """,
+            (db_name,),
+        ).fetchone()
+
+    if row is None:
+        raise ValueError(
+            f"Реквизиты для базы {db_name} не найдены"
+        )
+
+    return dict(row)
+
+
+def connect_to_db(credentials: dict[str, str]) -> PGConnection:
+    """Устанавливает соединение с PostgreSQL."""
+    return psycopg2.connect(
+        host=credentials["url"],
+        port=credentials["port"],
+        user=credentials["user"],
+        password=credentials["pass"],
+        database=credentials["db_name"],
+        connect_timeout=10,
     )
-    sys.exit(1)
 
-df = pd.read_parquet(parquet_path)
-df_100 = df.head(ROWS_COUNT)
 
-DB_HOST = os.getenv('DB_HOST')
-DB_PORT = os.getenv('DB_PORT')
-DB_USER = os.getenv('DB_USER')
-DB_PASS = os.getenv('DB_PASS')
-DB_NAME = os.getenv('DB_NAME')
+def prepare_columns(
+    df: pd.DataFrame,
+) -> tuple[list[str], list[sql.Composable]]:
+    """Подготавливает названия столбцов и SQL-типы."""
+    clean_columns = [
+        str(col).replace("(", "_")
+        .replace(")", "_")
+        .replace(".", "_")
+        .lower()
+        for col in df.columns
+    ]
 
-if not all([DB_HOST, DB_PORT, DB_USER, DB_PASS, DB_NAME]):
-    raise RuntimeError("Заданы не все переменные окружения.")
-
-conn = None
-cursor = None
-
-try:
-    print("Попытка подключения к PostgreSQL.")
-    conn = psycopg2.connect(
-        host=DB_HOST,
-        port=DB_PORT,
-        user=DB_USER,
-        password=DB_PASS,
-        database=DB_NAME,
-        connect_timeout=10
-    )
-
-    cursor = conn.cursor()
-    print("Успешное подключение.")
-
-    clean_columns = [col.replace('(', '_').replace(')', '_').replace('.', '_').lower() for col in df_100.columns]
-    
     sql_columns_parts = []
-    for col_old, col_clean in zip(df_100.columns, clean_columns):
-        if pd.api.types.is_numeric_dtype(df_100[col_old]):
+
+    for col_old, col_clean in zip(df.columns, clean_columns):
+        if pd.api.types.is_numeric_dtype(df[col_old]):
             type_sql = sql.SQL("DOUBLE PRECISION")
         else:
             type_sql = sql.SQL("TEXT")
 
         sql_columns_parts.append(
-            sql.SQL("{} {}").format(sql.Identifier(col_clean), type_sql)
+            sql.SQL("{} {}").format(
+                sql.Identifier(col_clean),
+                type_sql,
+            )
         )
 
-    print(f"[INFO] Таблица '{TABLE_NAME}' будет удалена и пересоздана.")
+    return clean_columns, sql_columns_parts
 
-    cursor.execute(
-        sql.SQL("DROP TABLE IF EXISTS {};").format(
-            sql.Identifier(TABLE_NAME)
+
+def write_dataframe(
+    conn: PGConnection,
+    df: pd.DataFrame,
+    table_name: str,
+) -> None:
+    """Пересоздаёт таблицу и записывает в неё DataFrame."""
+    clean_columns, sql_columns_parts = prepare_columns(df)
+
+    try:
+        with conn.cursor() as cursor:
+            print(f"Пересоздание таблицы '{table_name}'.")
+
+            cursor.execute(
+                sql.SQL("DROP TABLE IF EXISTS {};").format(
+                    sql.Identifier(table_name)
+                )
+            )
+
+            create_table_query = sql.SQL(
+                "CREATE TABLE {} (id SERIAL PRIMARY KEY, {});"
+            ).format(
+                sql.Identifier(table_name),
+                sql.SQL(", ").join(sql_columns_parts),
+            )
+
+            cursor.execute(create_table_query)
+
+            placeholders = sql.SQL(", ").join(
+                [sql.Placeholder()] * len(clean_columns)
+            )
+
+            insert_query = sql.SQL(
+                "INSERT INTO {} ({}) VALUES ({});"
+            ).format(
+                sql.Identifier(table_name),
+                sql.SQL(", ").join(
+                    sql.Identifier(col) for col in clean_columns
+                ),
+                placeholders,
+            )
+
+            data_records = [
+                tuple(row)
+                for _, row in df.iterrows()
+            ]
+
+            cursor.executemany(insert_query, data_records)
+
+        conn.commit()
+
+        print(
+            f"Успешно записано {len(df)} строк "
+            f"в таблицу '{table_name}'."
         )
-    )
-    
-    create_table_query = sql.SQL("CREATE TABLE {} (id SERIAL PRIMARY KEY, {});").format(
-        sql.Identifier(TABLE_NAME),
-        sql.SQL(", ").join(sql_columns_parts) # Используем правильный список
-    )
-    cursor.execute(create_table_query)
-    print(f"Таблица '{TABLE_NAME}' успешно пересоздана в PostgreSQL.")
 
-    placeholders = sql.SQL(", ").join([sql.Placeholder()] * len(clean_columns))
-    insert_query = sql.SQL("INSERT INTO {} ({}) VALUES ({});").format(
-        sql.Identifier(TABLE_NAME),
-        sql.SQL(", ").join(sql.Identifier(col) for col in clean_columns),
-        placeholders
-    )
-    
-    data_records = [tuple(row) for _, row in df_100.iterrows()]
-    cursor.executemany(insert_query, data_records)
-        
-    conn.commit()
-    print(f"\n100 строк датасета успешно записаны в удаленную таблицу PostgreSQL '{TABLE_NAME}'.")
-
-except Exception as e:
-    print(f"\nПроизошла ошибка при работе с PostgreSQL: {e}")
-    if conn:
+    except Exception:
         conn.rollback()
+        raise
 
-finally:
-    if cursor:
-        cursor.close()
-    if conn:
-        conn.close()
-    print("Соединение с базой данных закрыто.")
+
+if __name__ == "__main__":
+    conn = None
+
+    try:
+        df_100 = load_dataset(PARQUET_FILE, ROWS_COUNT)
+        credentials = load_credentials(CREDS_FILE, DB_NAME)
+
+        print(f"Подготовлено строк: {len(df_100)}")
+        print(f"База данных: {DB_NAME}")
+
+        print("Подключение к PostgreSQL...")
+        conn = connect_to_db(credentials)
+        print("Подключение успешно.")
+
+        write_dataframe(conn, df_100, TABLE_NAME)
+
+    except Exception as error:
+        print(f"Ошибка выполнения: {error}")
+        raise
+
+    finally:
+        if conn is not None:
+            conn.close()
+            print("Соединение с PostgreSQL закрыто.")
