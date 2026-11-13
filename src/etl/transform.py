@@ -12,20 +12,17 @@ def cast_types(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
     missing_columns = set(NUMERIC_COLUMNS) - set(df.columns)
-
     if missing_columns:
         raise ValueError(
             f"Отсутствуют столбцы: {sorted(missing_columns)}"
         )
 
     for col in NUMERIC_COLUMNS:
-        # Приводим значения к строкам и заменяем десятичные запятые
-        values = df[col].astype("string").str.replace(
-            ",", ".", regex=False
-        )
-
-        # Преобразуем значения в числа
-        df[col] = pd.to_numeric(values, errors="coerce")
+        if not pd.api.types.is_numeric_dtype(df[col]):
+            values = df[col].astype("string").str.replace(
+                ",", ".", regex=False
+            )
+            df[col] = pd.to_numeric(values, errors="coerce")
 
     return df
 

@@ -11,7 +11,8 @@ from etl.load import (
 from etl.transform import cast_types, validate_data
 
 
-DATA_DIR = Path.cwd() / "data"
+DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+
 
 CSV_FILE = DATA_DIR / "dataset_for_DME.csv"
 PARQUET_FILE = DATA_DIR / "etl_processed.parquet"

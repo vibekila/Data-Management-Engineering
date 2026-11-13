@@ -2,6 +2,7 @@ import sqlite3
 from contextlib import closing
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import psycopg2
 from psycopg2 import sql
@@ -128,8 +129,13 @@ def write_dataframe(
             )
 
             data_records = [
-                tuple(row)
-                for _, row in df.iterrows()
+                tuple(
+                    None if pd.isna(value)
+                    else value.item() if isinstance(value, np.generic)
+                    else value
+                    for value in row
+                )
+                for row in df.itertuples(index=False, name=None)
             ]
 
             cursor.executemany(insert_query, data_records)
