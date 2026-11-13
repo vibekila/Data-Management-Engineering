@@ -1,4 +1,3 @@
-
 import os
 from pathlib import Path
 
@@ -21,14 +20,20 @@ def cast_types(df: pd.DataFrame) -> pd.DataFrame:
         "EF50", "EIP", "EEp", "Penh", "AV", "TR", "Rpef",
     ]
 
-    for col in numeric_columns:
-        if col in df.columns:
-            if df[col].dtype == "object":
-                df[col] = df[col].astype(str).str.replace(
-                    ",", ".", regex=False
-                )
+    missing_columns = set(numeric_columns) - set(df.columns)
 
-            df[col] = pd.to_numeric(df[col], errors="coerce")
+    if missing_columns:
+        raise ValueError(
+            f"В датасете отсутствуют столбцы: {sorted(missing_columns)}"
+        )
+
+    for col in numeric_columns:
+        if df[col].dtype == "object":
+            df[col] = df[col].astype(str).str.replace(
+                ",", ".", regex=False
+            )
+
+        df[col] = pd.to_numeric(df[col], errors="coerce")
 
     return df
 
@@ -37,7 +42,7 @@ def load_and_show_data(
     path: Path,
     parquet_path: Path,
 ) -> pd.DataFrame:
-    """Загружает датасет, приводит типы и сохраняет Parquet."""
+    """Загружает датасет, преобразует типы и сохраняет Parquet."""
     path = Path(path)
     parquet_path = Path(parquet_path)
 
@@ -45,6 +50,7 @@ def load_and_show_data(
     parquet_path.parent.mkdir(parents=True, exist_ok=True)
 
     if parquet_path.is_file():
+        print("Загрузка данных из Parquet...")
         df = pd.read_parquet(parquet_path)
 
     else:
@@ -64,13 +70,16 @@ def load_and_show_data(
 
             os.replace(part_path, path)
 
-        df = pd.read_csv(path, sep=",", decimal=",")
+        print("Загрузка данных из CSV...")
+        df = pd.read_csv(path)
 
-    df = cast_types(df)
-    df.to_parquet(parquet_path, index=False)
+        df = cast_types(df)
+        df.to_parquet(parquet_path, index=False)
+
+        print(f"Датасет сохранён: {parquet_path}")
 
     print(df.head(10))
-    
+
     return df
 
 
