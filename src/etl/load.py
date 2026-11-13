@@ -1,6 +1,7 @@
 import sqlite3
 from contextlib import closing
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -9,8 +10,11 @@ from psycopg2 import sql
 from psycopg2.extensions import connection as PGConnection
 
 
-def to_native(value):
+def to_native(value: Any) -> Any:
     """Преобразует значения pandas и NumPy в типы Python."""
+    if isinstance(value, (list, tuple, dict)):
+        return value
+
     if pd.isna(value):
         return None
 
