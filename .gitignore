@@ -1,2 +1,9 @@
 *.parquet
 data/
+.env
+creds.db
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
