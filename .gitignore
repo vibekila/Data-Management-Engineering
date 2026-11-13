@@ -1,9 +1,19 @@
-*.parquet
+# Данные и конфиденциальная информация
 data/
+*.parquet
 .env
 creds.db
 
-# Python
+# Виртуальное окружение
 .venv/
+venv/
+
+# Служебные файлы Python
 __pycache__/
 *.py[cod]
+*.egg-info/
+
+# Кэш инструментов
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
