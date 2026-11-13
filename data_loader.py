@@ -70,7 +70,7 @@ def load_and_show_data(
     df.to_parquet(parquet_path, index=False)
 
     print(df.head(10))
-
+    
     return df
 
 
