@@ -9,6 +9,14 @@ from psycopg2 import sql
 from psycopg2.extensions import connection as PGConnection
 
 
+def to_native(value):
+    """Преобразует значения pandas и NumPy в типы Python."""
+    if pd.isna(value):
+        return None
+
+    return value.item() if isinstance(value, np.generic) else value
+
+
 def save_parquet(df: pd.DataFrame, file_path: Path) -> None:
     """Сохраняет обработанный DataFrame в формате Parquet."""
     file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -129,12 +137,7 @@ def write_dataframe(
             )
 
             data_records = [
-                tuple(
-                    None if pd.isna(value)
-                    else value.item() if isinstance(value, np.generic)
-                    else value
-                    for value in row
-                )
+                tuple(to_native(value) for value in row)
                 for row in df.itertuples(index=False, name=None)
             ]
 
